@@ -13,34 +13,30 @@ export const fetchTodayCommits = async (
   // We'll use the /users/{username}/events API to find PushEvents.
   
   try {
-    const response = await axios.get(`https://api.github.com/users/${username}/events`, {
+    const today = since.split('T')[0]; // Extract YYYY-MM-DD
+    const query = `author:${username} committer-date:>=${today}`;
+    
+    const response = await axios.get(`https://api.github.com/search/commits`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github.v3+json',
       },
       params: {
+        q: query,
         per_page: 100,
+        sort: 'author-date',
+        order: 'desc'
       },
     });
 
-    const events = response.data;
+    const items = response.data.items || [];
     
-    for (const event of events) {
-      if (event.type === 'PushEvent' && new Date(event.created_at) >= new Date(since)) {
-        const repoName = event.repo.name;
-        const pushCommits = event.payload.commits || [];
-        
-        for (const commit of pushCommits) {
-          // Verify it's the user's commit
-          if (commit.author.name === username || event.actor.login === username) {
-            commits.push({
-              repoName,
-              message: commit.message,
-              date: event.created_at,
-            });
-          }
-        }
-      }
+    for (const item of items) {
+      commits.push({
+        repoName: item.repository.full_name,
+        message: item.commit.message,
+        date: item.commit.author.date,
+      });
     }
     
     return commits;
