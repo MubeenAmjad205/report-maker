@@ -14,12 +14,20 @@ export const config = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     chatId: process.env.TELEGRAM_CHAT_ID || '',
   },
+  msteams: {
+    webhookUrl: process.env.MSTEAMS_WEBHOOK_URL || '',
+  }
 };
 
 export const validateConfig = (): void => {
   if (!config.github.token) throw new Error('GH_PAT is required');
   if (!config.github.username) throw new Error('GITHUB_USERNAME is required');
   if (!config.ai.apiKey) throw new Error('AI_API_KEY is required');
-  if (!config.telegram.botToken) throw new Error('TELEGRAM_BOT_TOKEN is required');
-  if (!config.telegram.chatId) throw new Error('TELEGRAM_CHAT_ID is required');
+  
+  const hasTelegram = config.telegram.botToken && config.telegram.chatId;
+  const hasMsTeams = !!config.msteams.webhookUrl;
+
+  if (!hasTelegram && !hasMsTeams) {
+    throw new Error('You must configure at least one delivery method: Telegram or MS Teams.');
+  }
 };

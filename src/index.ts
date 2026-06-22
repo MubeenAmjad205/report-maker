@@ -37,9 +37,17 @@ const main = async () => {
 
     console.log('Report generated successfully.');
 
-    // 4. Delivery (Telegram)
-    console.log('Sending report to Telegram...');
-    await sendTelegramMessage(config.telegram.botToken, config.telegram.chatId, report);
+    // 4. Delivery
+    if (config.msteams.webhookUrl) {
+      console.log('Sending report to MS Teams...');
+      const { sendMSTeamsMessage } = await import('./features/notifier/msteams');
+      await sendMSTeamsMessage(config.msteams.webhookUrl, report);
+    }
+    
+    if (config.telegram.botToken && config.telegram.chatId) {
+      console.log('Sending report to Telegram...');
+      await sendTelegramMessage(config.telegram.botToken, config.telegram.chatId, report);
+    }
 
     console.log('Report Maker completed successfully.');
   } catch (error) {
