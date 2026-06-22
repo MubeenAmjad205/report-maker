@@ -36,6 +36,7 @@ export const fetchTodayCommits = async (
         repoName: item.repository.full_name,
         message: item.commit.message,
         date: item.commit.author.date,
+        authorName: item.commit.author.name,
       });
     }
     

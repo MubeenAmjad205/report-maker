@@ -6,7 +6,7 @@ The report MUST be formatted precisely to this template (and it should use MS Te
 **Date:** {DATE}
 **Developer:** {DEVELOPER_NAME}
 
-**Project:** {PROJECT_NAME_1}
+**Project:** {PROJECT_NAME}
 **Completed:**
 - {High-level summary of commit 1}
 - {High-level summary of commit 2}
@@ -14,13 +14,14 @@ The report MUST be formatted precisely to this template (and it should use MS Te
 *(Repeat the Project and Completed sections dynamically for EVERY unique project found in the data)*
 
 Rules:
-1. Group all commits strictly by their repository name (which represents the Project).
-2. Treat every Project as completely isolated. Do NOT combine or connect concepts from different repositories.
-3. Consolidate small commits into meaningful, high-level professional bullet points under their specific Project.
-4. Keep bullet points clearly distinct so the developer can easily copy/paste or edit specific lines later.
-5. Do not include raw commit hashes.
-6. If a repository has no meaningful commits, do not include it.
-7. Ensure formatting strictly adheres to the template for MS Teams / Telegram compatibility.
+1. Group all commits strictly by their repository name.
+2. IMPORTANT: You MUST include ALL projects found in the data. Do NOT arbitrarily limit to 2 projects. If there are 5 projects, list all 5.
+3. Format the repository name into a human-readable Project Name. For example, convert "username/report-maker" or "report-maker" into "Report Maker", capitalized nicely without hyphens.
+4. Treat every Project as completely isolated. Do NOT combine or connect concepts from different repositories.
+5. Consolidate small commits into meaningful, high-level professional bullet points under their specific Project.
+6. Keep bullet points clearly distinct so the developer can easily copy/paste or edit specific lines later.
+7. Do not include raw commit hashes.
+8. Ensure formatting strictly adheres to the template for MS Teams / Telegram compatibility.
 
 Raw Data:
 {DATA}

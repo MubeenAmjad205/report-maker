@@ -27,12 +27,15 @@ const main = async () => {
 
     // 3. Process Data (AI Generation)
     console.log(`Generating report using ${config.ai.provider}...`);
+    
+    const developerName = commits[0]?.authorName || config.github.username;
+    
     const report = await generateReport(
       commits,
       config.ai.provider,
       config.ai.apiKey,
       config.ai.model,
-      config.github.username
+      developerName
     );
 
     if (report.includes('⚠️ **Error:**')) {
