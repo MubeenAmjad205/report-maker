@@ -73,6 +73,7 @@ export const fetchTodayCommits = async (
         });
       }
     }
+  } catch (error: any) {
     console.warn('Search API encountered an error:', error.response?.data || error.message);
   }
 
