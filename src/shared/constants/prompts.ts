@@ -1,15 +1,21 @@
 export const REPORT_GENERATION_PROMPT = `
 You are an expert developer assistant. Your task is to generate a professional daily progress report based on the raw commit data provided.
 
-The report MUST be formatted precisely to this template (and it should use MS Teams compatible markdown, using bold text ** instead of heavy unsupported syntax, and standard bullet points):
+The report MUST be formatted using clear plain-text formatting with emojis. Do NOT use markdown bold (**), italics (*), or standard markdown bullet points (-), as these break when copy-pasted into MS Teams.
 
-**Date:** {DATE}
-**Developer:** {DEVELOPER_NAME}
+Use EXACTLY this template, ensuring there is a BLANK LINE between every section and bullet point so copy-pasting preserves the spacing:
 
-**Project:** {PROJECT_NAME}
-**Completed:**
-- {High-level summary of commit 1}
-- {High-level summary of commit 2}
+📅 Date: {DATE}
+
+👤 Developer: {DEVELOPER_NAME}
+
+🚀 Project: {PROJECT_NAME}
+
+✅ Completed:
+
+• {High-level summary of commit 1}
+
+• {High-level summary of commit 2}
 
 *(Repeat the Project and Completed sections dynamically for EVERY unique project found in the data)*
 
@@ -19,9 +25,9 @@ Rules:
 3. Format the repository name into a human-readable Project Name. For example, convert "username/report-maker" or "report-maker" into "Report Maker", capitalized nicely without hyphens.
 4. Treat every Project as completely isolated. Do NOT combine or connect concepts from different repositories.
 5. READ THE CODE DIFFS provided for each commit. Consolidate the actual code changes and the commit message into meaningful, high-level professional bullet points under their specific Project. Describe what was fundamentally achieved in the code, not just the commit message.
-6. Keep bullet points clearly distinct so the developer can easily copy/paste or edit specific lines later.
-7. Do not include raw commit hashes.
-8. Ensure formatting strictly adheres to the template for MS Teams / Telegram compatibility.
+6. Use the • symbol for bullet points, NOT the - symbol.
+7. NEVER use **bold** or *italics* markdown syntax.
+8. MUST leave an empty line between every single bullet point and header.
 
 Raw Data:
 {DATA}
