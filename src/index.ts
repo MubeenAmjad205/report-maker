@@ -35,7 +35,11 @@ const main = async () => {
       config.github.username
     );
 
-    console.log('Report generated successfully.');
+    if (report.includes('⚠️ **Error:**')) {
+      console.log('Report generation failed. Sending error notification.');
+    } else {
+      console.log('Report generated successfully.');
+    }
 
     // 4. Delivery
     if (config.msteams.webhookUrl) {
@@ -50,8 +54,24 @@ const main = async () => {
     }
 
     console.log('Report Maker completed successfully.');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Report Maker encountered an error:', error);
+    
+    // Attempt to notify of global failure if config allows
+    try {
+      const errorMsg = `⚠️ **CRITICAL FAILURE:** Report Maker encountered an unexpected error.\n\n\`\`\`json\n${JSON.stringify(error.message || error, null, 2)}\n\`\`\``;
+      
+      if (config.msteams?.webhookUrl) {
+        const { sendMSTeamsMessage } = await import('./features/notifier/msteams');
+        await sendMSTeamsMessage(config.msteams.webhookUrl, errorMsg);
+      }
+      if (config.telegram?.botToken && config.telegram?.chatId) {
+        await sendTelegramMessage(config.telegram.botToken, config.telegram.chatId, errorMsg);
+      }
+    } catch (deliveryError) {
+      console.error('Failed to send error notification:', deliveryError);
+    }
+    
     process.exit(1);
   }
 };
