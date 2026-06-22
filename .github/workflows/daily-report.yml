@@ -1,0 +1,33 @@
+name: Daily Report Maker
+
+on:
+  schedule:
+    # 13:45 UTC is 18:45 (6:45 PM) GMT+5.
+    # 1-6 means Monday through Saturday (skips Sunday).
+    - cron: '45 13 * * 1-6'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Report Maker
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_USERNAME: ${{ secrets.GITHUB_USERNAME }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm start
