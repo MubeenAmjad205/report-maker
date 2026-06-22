@@ -11,7 +11,7 @@ export const generateReport = async (
   developerName: string
 ): Promise<string> => {
   if (commits.length === 0) {
-    return 'No commits found for today.';
+    return `**Date:** ${getTodayDateString()}\n**Developer:** ${developerName}\n\n**No potential tasks completed today.**`;
   }
 
   const dataStr = commits

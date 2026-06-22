@@ -6,14 +6,12 @@ The report MUST be formatted precisely to this template (and it should use MS Te
 **Date:** {DATE}
 **Developer:** {DEVELOPER_NAME}
 
-**Project:** {PROJECT_NAME}
+**Project:** {PROJECT_NAME_1}
 **Completed:**
 - {High-level summary of commit 1}
 - {High-level summary of commit 2}
 
-**Project:** {ANOTHER_PROJECT_NAME}
-**Completed:**
-- {High-level summary of commit 1}
+*(Repeat the Project and Completed sections dynamically for EVERY unique project found in the data)*
 
 Rules:
 1. Group all commits strictly by their repository name (which represents the Project).

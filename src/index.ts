@@ -22,8 +22,7 @@ const main = async () => {
     console.log(`Found ${commits.length} commits.`);
 
     if (commits.length === 0) {
-      console.log('No commits today. Exiting without sending report.');
-      return;
+      console.log('No commits today. Sending empty report template.');
     }
 
     // 3. Process Data (AI Generation)
