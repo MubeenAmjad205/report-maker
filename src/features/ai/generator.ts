@@ -15,7 +15,7 @@ export const generateReport = async (
   }
 
   const dataStr = commits
-    .map((c) => `Repo: ${c.repoName} | Message: ${c.message}`)
+    .map((c) => `Repo: ${c.repoName}\nMessage: ${c.message}\nCode Diff:\n${c.codeDiff}\n---`)
     .join('\n');
 
   const prompt = REPORT_GENERATION_PROMPT

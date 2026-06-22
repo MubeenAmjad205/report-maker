@@ -3,6 +3,7 @@ export interface GithubCommit {
   message: string;
   date: string;
   authorName?: string;
+  codeDiff?: string;
 }
 
 export interface FormattedReport {

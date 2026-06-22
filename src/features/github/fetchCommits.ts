@@ -7,68 +7,98 @@ export const fetchTodayCommits = async (
   since: string
 ): Promise<GithubCommit[]> => {
   const commitsMap = new Map<string, GithubCommit>();
-  const todayDateStr = since.split('T')[0]; // Extract YYYY-MM-DD
-  
-  // 1. Fetch from Search API (captures older branches, but misses unverified emails and non-default branches)
+  const sinceDate = new Date(since);
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+  };
+
+  // 1. Fetch from Events API (up to 3 pages) to heavily guarantee we catch non-default branches
+  for (let page = 1; page <= 3; page++) {
+    try {
+      const eventsRes = await axios.get(`https://api.github.com/users/${username}/events`, {
+        headers,
+        params: { per_page: 100, page },
+      });
+
+      const events = eventsRes.data || [];
+      if (events.length === 0) break;
+
+      for (const event of events) {
+        if (event.type === 'PushEvent') {
+          const eventDate = new Date(event.created_at);
+          if (eventDate >= sinceDate) {
+            const repoName = event.repo.name;
+            for (const commit of event.payload.commits || []) {
+              const key = `${repoName}-${commit.sha}`;
+              if (!commitsMap.has(key)) {
+                commitsMap.set(key, {
+                  repoName,
+                  message: commit.message,
+                  date: event.created_at,
+                  authorName: commit.author?.name || username,
+                  codeDiff: commit.url // Temporarily store URL, we'll fetch the code below
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.warn(`Events API page ${page} encountered an error:`, error.response?.data || error.message);
+      break;
+    }
+  }
+
+  // 2. Fallback to Search API (in case events missed something, but search API lacks branch support)
   try {
+    const todayDateStr = since.split('T')[0];
     const query = `author:${username} committer-date:>=${todayDateStr}`;
     const searchRes = await axios.get(`https://api.github.com/search/commits`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
+      headers,
       params: { q: query, per_page: 100, sort: 'author-date', order: 'desc' },
     });
 
     const items = searchRes.data.items || [];
     for (const item of items) {
       const repoName = item.repository.full_name;
-      const message = item.commit.message;
-      commitsMap.set(`${repoName}-${message}`, {
-        repoName,
-        message,
-        date: item.commit.author.date,
-        authorName: item.commit.author.name,
-      });
+      const key = `${repoName}-${item.sha}`;
+      if (!commitsMap.has(key)) {
+        commitsMap.set(key, {
+          repoName,
+          message: item.commit.message,
+          date: item.commit.author.date,
+          authorName: item.commit.author.name,
+          codeDiff: item.url
+        });
+      }
     }
   } catch (error: any) {
     console.warn('Search API encountered an error:', error.response?.data || error.message);
   }
 
-  // 2. Fetch from Events API (captures real-time pushes, non-default branches, and different git emails)
-  try {
-    const eventsRes = await axios.get(`https://api.github.com/users/${username}/events`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-      params: { per_page: 100 },
-    });
+  const uniqueCommits = Array.from(commitsMap.values());
 
-    const events = eventsRes.data || [];
-    for (const event of events) {
-      if (event.type === 'PushEvent') {
-        const repoName = event.repo.name;
-        // events API returns date in 'created_at' e.g. 2026-06-22T...
-        if (event.created_at >= todayDateStr) {
-          for (const commit of event.payload.commits || []) {
-            const message = commit.message;
-            const key = `${repoName}-${message}`;
-            if (!commitsMap.has(key)) {
-              commitsMap.set(key, {
-                repoName,
-                message,
-                date: event.created_at,
-                authorName: commit.author?.name || username,
-              });
-            }
-          }
-        }
+  // 3. Fetch Code Diffs for each commit to allow the AI to read the actual code changes
+  for (const commit of uniqueCommits) {
+    if (commit.codeDiff && commit.codeDiff.startsWith('https://api.github.com/')) {
+      try {
+        const commitData = await axios.get(commit.codeDiff, { headers });
+        const files = commitData.data.files || [];
+        // Combine patches of modified files, truncate to 1500 chars to avoid prompt token limits
+        const patch = files
+          .map((f: any) => `File: ${f.filename}\n${f.patch || 'No patch available'}`)
+          .join('\n\n')
+          .substring(0, 1500);
+        
+        commit.codeDiff = patch ? patch : 'No code changes found.';
+      } catch (e) {
+        commit.codeDiff = 'Failed to fetch code diff.';
       }
+    } else {
+      commit.codeDiff = 'No URL available for diff.';
     }
-  } catch (error: any) {
-    console.warn('Events API encountered an error:', error.response?.data || error.message);
   }
 
-  return Array.from(commitsMap.values());
+  return uniqueCommits;
 };
