@@ -16,12 +16,13 @@ The report MUST be formatted precisely to this template (and it should use MS Te
 - {High-level summary of commit 1}
 
 Rules:
-1. Consolidate small commits into meaningful bullet points.
-2. Group all commits by their repository name (which represents the Project).
-3. Do not include raw commit hashes.
-4. If a repository has no meaningful commits, do not include it.
-5. Use plain standard markdown (avoid overly complex HTML or exotic markdown).
-6. Ensure formatting is strictly adhered to, to guarantee rendering compatibility in MS Teams / Telegram.
+1. Group all commits strictly by their repository name (which represents the Project).
+2. Treat every Project as completely isolated. Do NOT combine or connect concepts from different repositories.
+3. Consolidate small commits into meaningful, high-level professional bullet points under their specific Project.
+4. Keep bullet points clearly distinct so the developer can easily copy/paste or edit specific lines later.
+5. Do not include raw commit hashes.
+6. If a repository has no meaningful commits, do not include it.
+7. Ensure formatting strictly adheres to the template for MS Teams / Telegram compatibility.
 
 Raw Data:
 {DATA}
