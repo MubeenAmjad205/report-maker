@@ -17,7 +17,6 @@ export const sendTelegramMessage = async (
     await axios.post(url, {
       chat_id: chatId,
       text: message,
-      parse_mode: 'Markdown', // We use standard Markdown parsing to match the MS Teams compatible format
     });
     console.log('Successfully sent message to Telegram.');
   } catch (error: any) {
