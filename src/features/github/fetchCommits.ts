@@ -6,43 +6,69 @@ export const fetchTodayCommits = async (
   username: string,
   since: string
 ): Promise<GithubCommit[]> => {
-  const commits: GithubCommit[] = [];
+  const commitsMap = new Map<string, GithubCommit>();
+  const todayDateStr = since.split('T')[0]; // Extract YYYY-MM-DD
   
-  // To get commits across all repos, the simplest way via REST API is to query the user's events
-  // However, events API only returns up to 300 events. For a single day, this is usually enough.
-  // We'll use the /users/{username}/events API to find PushEvents.
-  
+  // 1. Fetch from Search API (captures older branches, but misses unverified emails and non-default branches)
   try {
-    const today = since.split('T')[0]; // Extract YYYY-MM-DD
-    const query = `author:${username} committer-date:>=${today}`;
-    
-    const response = await axios.get(`https://api.github.com/search/commits`, {
+    const query = `author:${username} committer-date:>=${todayDateStr}`;
+    const searchRes = await axios.get(`https://api.github.com/search/commits`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github.v3+json',
       },
-      params: {
-        q: query,
-        per_page: 100,
-        sort: 'author-date',
-        order: 'desc'
-      },
+      params: { q: query, per_page: 100, sort: 'author-date', order: 'desc' },
     });
 
-    const items = response.data.items || [];
-    
+    const items = searchRes.data.items || [];
     for (const item of items) {
-      commits.push({
-        repoName: item.repository.full_name,
-        message: item.commit.message,
+      const repoName = item.repository.full_name;
+      const message = item.commit.message;
+      commitsMap.set(`${repoName}-${message}`, {
+        repoName,
+        message,
         date: item.commit.author.date,
         authorName: item.commit.author.name,
       });
     }
-    
-    return commits;
-  } catch (error) {
-    console.error('Error fetching commits from GitHub:', error);
-    throw error;
+  } catch (error: any) {
+    console.warn('Search API encountered an error:', error.response?.data || error.message);
   }
+
+  // 2. Fetch from Events API (captures real-time pushes, non-default branches, and different git emails)
+  try {
+    const eventsRes = await axios.get(`https://api.github.com/users/${username}/events`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+      params: { per_page: 100 },
+    });
+
+    const events = eventsRes.data || [];
+    for (const event of events) {
+      if (event.type === 'PushEvent') {
+        const repoName = event.repo.name;
+        // events API returns date in 'created_at' e.g. 2026-06-22T...
+        if (event.created_at >= todayDateStr) {
+          for (const commit of event.payload.commits || []) {
+            const message = commit.message;
+            const key = `${repoName}-${message}`;
+            if (!commitsMap.has(key)) {
+              commitsMap.set(key, {
+                repoName,
+                message,
+                date: event.created_at,
+                authorName: commit.author?.name || username,
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (error: any) {
+    console.warn('Events API encountered an error:', error.response?.data || error.message);
+  }
+
+  return Array.from(commitsMap.values());
 };
