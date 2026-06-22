@@ -49,8 +49,11 @@ Go to your GitHub Repository -> **Settings** -> **Secrets and variables** -> **A
 | \`GITHUB_USERNAME\` | Your exact GitHub username (used for filtering commits). | \`yourusername\` |
 | \`AI_PROVIDER\` | The AI model you wish to use. Options: \`GEMINI\`, \`OPENAI\`, \`OPENROUTER\`. | \`GEMINI\` |
 | \`AI_API_KEY\` | The API key corresponding to your chosen AI provider. | \`AIzaSy...\` |
-| \`TELEGRAM_BOT_TOKEN\` | Bot token obtained from \`@BotFather\` on Telegram. | \`123456:ABC-DEF...\` |
-| \`TELEGRAM_CHAT_ID\` | The ID of the Telegram user or group to send the report to. | \`123456789\` |
+| \`TELEGRAM_BOT_TOKEN\` | (Optional) Bot token obtained from \`@BotFather\` on Telegram. | \`123456:ABC-DEF...\` |
+| \`TELEGRAM_CHAT_ID\` | (Optional) The ID of the Telegram user or group to send the report to. | \`123456789\` |
+| \`MSTEAMS_WEBHOOK_URL\` | (Optional) The incoming webhook URL for your MS Teams channel. | \`https://...webhook.office.com...\` |
+
+> **Note:** You must configure *at least one* delivery method (either Telegram OR MS Teams, or both).
 
 ### 3. Schedule Modification (Optional)
 By default, the report is generated every day **except Sunday** at **6:45 PM GMT+5**.
