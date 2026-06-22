@@ -28,7 +28,7 @@ export const fetchTodayCommits = async (
     for (const event of events) {
       if (event.type === 'PushEvent' && new Date(event.created_at) >= new Date(since)) {
         const repoName = event.repo.name;
-        const pushCommits = event.payload.commits;
+        const pushCommits = event.payload.commits || [];
         
         for (const commit of pushCommits) {
           // Verify it's the user's commit
