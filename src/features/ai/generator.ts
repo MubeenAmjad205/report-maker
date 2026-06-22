@@ -7,6 +7,7 @@ export const generateReport = async (
   commits: GithubCommit[],
   providerName: string,
   apiKey: string,
+  model: string,
   developerName: string
 ): Promise<string> => {
   if (commits.length === 0) {
@@ -25,7 +26,7 @@ export const generateReport = async (
   const providerFn = getAIProvider(providerName);
   
   try {
-    const result = await providerFn(prompt, apiKey);
+    const result = await providerFn(prompt, apiKey, model);
     return result;
   } catch (error) {
     console.error('Error generating report with AI:', error);

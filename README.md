@@ -47,7 +47,8 @@ Go to your GitHub Repository -> **Settings** -> **Secrets and variables** -> **A
 |---|---|---|
 | \`GH_PAT\` | GitHub Personal Access Token (classic) with \`repo\` scope to read commits. | \`ghp_abc123...\` |
 | \`GITHUB_USERNAME\` | Your exact GitHub username (used for filtering commits). | \`yourusername\` |
-| \`AI_PROVIDER\` | The AI model you wish to use. Options: \`GEMINI\`, \`OPENAI\`, \`OPENROUTER\`. | \`GEMINI\` |
+| \`AI_PROVIDER\` | The AI model you wish to use. Options: \`GEMINI\`, \`OPENAI\`, \`OPENROUTER\`. | \`OPENROUTER\` |
+| \`AI_MODEL\` | The specific model string to use with your provider. | \`google/gemini-flash-1.5\` |
 | \`AI_API_KEY\` | The API key corresponding to your chosen AI provider. | \`AIzaSy...\` |
 | \`TELEGRAM_BOT_TOKEN\` | (Optional) Bot token obtained from \`@BotFather\` on Telegram. | \`123456:ABC-DEF...\` |
 | \`TELEGRAM_CHAT_ID\` | (Optional) The ID of the Telegram user or group to send the report to. | \`123456789\` |

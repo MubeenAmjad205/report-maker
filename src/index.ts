@@ -32,6 +32,7 @@ const main = async () => {
       commits,
       config.ai.provider,
       config.ai.apiKey,
+      config.ai.model,
       config.github.username
     );
 

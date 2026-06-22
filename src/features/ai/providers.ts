@@ -1,22 +1,22 @@
 import axios from 'axios';
 import { AI_PROVIDERS } from '../../shared/constants/flags';
 
-export type AIProviderCall = (prompt: string, apiKey: string) => Promise<string>;
+export type AIProviderCall = (prompt: string, apiKey: string, model: string) => Promise<string>;
 
-export const generateWithGemini: AIProviderCall = async (prompt, apiKey) => {
+export const generateWithGemini: AIProviderCall = async (prompt, apiKey, model) => {
   // Using the new Gemini REST endpoint (e.g. gemini-1.5-flash)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-1.5-flash'}:generateContent?key=${apiKey}`;
   const response = await axios.post(url, {
     contents: [{ parts: [{ text: prompt }] }],
   });
   return response.data.candidates[0].content.parts[0].text;
 };
 
-export const generateWithOpenAI: AIProviderCall = async (prompt, apiKey) => {
+export const generateWithOpenAI: AIProviderCall = async (prompt, apiKey, model) => {
   const response = await axios.post(
     'https://api.openai.com/v1/chat/completions',
     {
-      model: 'gpt-4o-mini',
+      model: model || 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
     },
     {
@@ -28,11 +28,11 @@ export const generateWithOpenAI: AIProviderCall = async (prompt, apiKey) => {
   return response.data.choices[0].message.content;
 };
 
-export const generateWithOpenRouter: AIProviderCall = async (prompt, apiKey) => {
+export const generateWithOpenRouter: AIProviderCall = async (prompt, apiKey, model) => {
   const response = await axios.post(
     'https://openrouter.ai/api/v1/chat/completions',
     {
-      model: 'google/gemini-flash-1.5',
+      model: model || 'google/gemini-flash-1.5',
       messages: [{ role: 'user', content: prompt }],
     },
     {
