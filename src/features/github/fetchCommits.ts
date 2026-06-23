@@ -133,19 +133,39 @@ export const fetchTodayCommits = async (
     if (commit.codeDiff && commit.codeDiff.startsWith('https://api.github.com/')) {
       try {
         const commitData = await axios.get(commit.codeDiff, { headers });
-        const files = commitData.data.files || [];
-        // Combine patches of modified files, truncate to 1500 chars to avoid prompt token limits
+        const IGNORED_EXTS = ['.lock', 'package-lock.json', 'yarn.lock', '.svg', '.png', '.jpg', 'dist/', 'build/', '.min.js'];
+        const files = (commitData.data.files || []).filter(
+          (f: any) => !IGNORED_EXTS.some(ext => f.filename.endsWith(ext) || f.filename.includes(ext))
+        );
+        
+        // Smart Token Optimization: Truncate per-file to ensure we see all files, rather than blindly truncating the massive string
+        let totalAdditions = 0;
+        let totalDeletions = 0;
+        
         const patch = files
-          .map((f: any) => `File: ${f.filename}\n${f.patch || 'No patch available'}`)
+          .map((f: any) => {
+            totalAdditions += f.additions || 0;
+            totalDeletions += f.deletions || 0;
+            const filePatch = f.patch || 'No patch available';
+            // 400 chars is usually enough to see the core logic change without reading boilerplate
+            return `File: ${f.filename}\n${filePatch.substring(0, 400)}${filePatch.length > 400 ? '...(truncated)' : ''}`;
+          })
           .join('\n\n')
-          .substring(0, 1500);
+          .substring(0, 2000); // Safe maximum per commit
         
         commit.codeDiff = patch ? patch : 'No code changes found.';
+        commit.stats = {
+          files: files.length,
+          additions: totalAdditions,
+          deletions: totalDeletions,
+        };
       } catch (e) {
         commit.codeDiff = 'Failed to fetch code diff.';
+        commit.stats = { files: 0, additions: 0, deletions: 0 };
       }
     } else {
       commit.codeDiff = 'No URL available for diff.';
+      commit.stats = { files: 0, additions: 0, deletions: 0 };
     }
   }
 

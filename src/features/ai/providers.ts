@@ -1,7 +1,16 @@
 import axios from 'axios';
 import { AI_PROVIDERS } from '../../shared/constants/flags';
 
-export type AIProviderCall = (prompt: string, apiKey: string, model: string) => Promise<string>;
+export interface AIProviderResponse {
+  text: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+export type AIProviderCall = (prompt: string, apiKey: string, model: string) => Promise<AIProviderResponse>;
 
 export const generateWithGemini: AIProviderCall = async (prompt, apiKey, model) => {
   // Using the new Gemini REST endpoint (e.g. gemini-1.5-flash)
@@ -9,7 +18,15 @@ export const generateWithGemini: AIProviderCall = async (prompt, apiKey, model) 
   const response = await axios.post(url, {
     contents: [{ parts: [{ text: prompt }] }],
   });
-  return response.data.candidates[0].content.parts[0].text;
+  const usage = response.data.usageMetadata;
+  return {
+    text: response.data.candidates[0].content.parts[0].text,
+    usage: usage ? {
+      promptTokens: usage.promptTokenCount,
+      completionTokens: usage.candidatesTokenCount,
+      totalTokens: usage.totalTokenCount,
+    } : undefined
+  };
 };
 
 export const generateWithOpenAI: AIProviderCall = async (prompt, apiKey, model) => {
@@ -25,7 +42,15 @@ export const generateWithOpenAI: AIProviderCall = async (prompt, apiKey, model) 
       },
     }
   );
-  return response.data.choices[0].message.content;
+  const usage = response.data.usage;
+  return {
+    text: response.data.choices[0].message.content,
+    usage: usage ? {
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
+      totalTokens: usage.total_tokens,
+    } : undefined
+  };
 };
 
 export const generateWithOpenRouter: AIProviderCall = async (prompt, apiKey, model) => {
@@ -41,7 +66,15 @@ export const generateWithOpenRouter: AIProviderCall = async (prompt, apiKey, mod
       },
     }
   );
-  return response.data.choices[0].message.content;
+  const usage = response.data.usage;
+  return {
+    text: response.data.choices[0].message.content,
+    usage: usage ? {
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
+      totalTokens: usage.total_tokens,
+    } : undefined
+  };
 };
 
 export const getAIProvider = (providerKey: string): AIProviderCall => {
