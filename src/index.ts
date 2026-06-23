@@ -30,7 +30,7 @@ const main = async () => {
     
     const developerName = commits[0]?.authorName || config.github.username;
     
-    const report = await generateReport(
+    const result = await generateReport(
       commits,
       config.ai.provider,
       config.ai.apiKey,
@@ -38,7 +38,9 @@ const main = async () => {
       developerName
     );
 
-    if (report.includes('⚠️ **Error:**')) {
+    const report = result.report;
+
+    if (report.includes('⚠️ Error:')) {
       console.log('Report generation failed. Sending error notification.');
     } else {
       console.log('Report generated successfully.');
@@ -54,6 +56,34 @@ const main = async () => {
     if (config.telegram.botToken && config.telegram.chatId) {
       console.log('Sending report to Telegram...');
       await sendTelegramMessage(config.telegram.botToken, config.telegram.chatId, report);
+      
+      // Secondary Telemetry Message
+      console.log('Sending technical telemetry to Telegram...');
+      let telemetryMsg = `🛠️ 𝗧𝗲𝗰𝗵𝗻𝗶𝗰𝗮𝗹 𝗧𝗲𝗹𝗲𝗺𝗲𝘁𝗿𝘆 𝗥𝗲𝗽𝗼𝗿𝘁\n\n`;
+      telemetryMsg += `⏱️ 𝗘𝘅𝗲𝗰𝘂𝘁𝗶𝗼𝗻 𝗙𝗹𝗼𝘄:\n`;
+      telemetryMsg += `1️⃣ Search & Events API Retrieval\n`;
+      telemetryMsg += `2️⃣ Direct Repository & Branch Fallback Scan\n`;
+      telemetryMsg += `3️⃣ Code Diff Extraction & Token Optimization\n`;
+      telemetryMsg += `4️⃣ AI Synthesis via ${config.ai.provider}\n\n`;
+      
+      const totalFiles = commits.reduce((sum, c) => sum + (c.stats?.files || 0), 0);
+      telemetryMsg += `📊 𝗗𝗮𝘁𝗮 𝗦𝘁𝗮𝘁𝘀:\n`;
+      telemetryMsg += `• Total Commits Found: ${commits.length}\n`;
+      telemetryMsg += `• Total Files Processed: ${totalFiles}\n`;
+      telemetryMsg += `• Filtered/Missed: .lock files, images, and build folders (Ignored to save tokens)\n\n`;
+
+      telemetryMsg += `🤖 𝗔𝗜 𝗧𝗼𝗸𝗲𝗻 𝗨𝘀𝗮𝗴𝗲 (${config.ai.model}):\n`;
+      telemetryMsg += `• Raw Prompt String: ~${result.promptSize} characters\n`;
+      
+      if (result.telemetry) {
+        telemetryMsg += `• Prompt Tokens: ${result.telemetry.promptTokens || 'N/A'}\n`;
+        telemetryMsg += `• Completion Tokens: ${result.telemetry.completionTokens || 'N/A'}\n`;
+        telemetryMsg += `• Total Tokens Consumed: ${result.telemetry.totalTokens || 'N/A'}\n`;
+      } else {
+        telemetryMsg += `• Token metrics not provided by this AI Provider.\n`;
+      }
+      
+      await sendTelegramMessage(config.telegram.botToken, config.telegram.chatId, telemetryMsg);
     }
 
     console.log('Report Maker completed successfully.');

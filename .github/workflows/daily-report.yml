@@ -2,9 +2,9 @@ name: Daily Report Maker
 
 on:
   schedule:
-    # 13:45 UTC is 18:45 (6:45 PM) GMT+5.
+    # 14:45 UTC is 19:45 (7:45 PM) GMT+5.
     # 1-6 means Monday through Saturday (skips Sunday).
-    - cron: "45 13 * * 1-6"
+    - cron: "45 14 * * 1-6"
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
