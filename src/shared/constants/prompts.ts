@@ -9,9 +9,6 @@ Use EXACTLY this template, ensuring there is a BLANK LINE between every section 
 
 👤 Developer: {DEVELOPER_NAME}
 
-📊 Executive Summary:
-{Write a single, highly professional 2-3 sentence overview synthesizing the primary focus and biggest achievements across ALL projects today}
-
 🚀 Project: {PROJECT_NAME} ({NUMBER} Commits)
 📈 Stats: {FILES} Files Changed • +{ADDITIONS} • -{DELETIONS}
 
