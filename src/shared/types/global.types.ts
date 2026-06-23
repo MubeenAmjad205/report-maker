@@ -4,6 +4,11 @@ export interface GithubCommit {
   date: string;
   authorName?: string;
   codeDiff?: string;
+  stats?: {
+    files: number;
+    additions: number;
+    deletions: number;
+  };
 }
 
 export interface FormattedReport {
