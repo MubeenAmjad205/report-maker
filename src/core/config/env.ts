@@ -7,9 +7,9 @@ export const config = {
     username: process.env.GITHUB_USERNAME || '',
   },
   ai: {
-    provider: (process.env.AI_PROVIDER || 'GEMINI').toUpperCase(),
+    provider: (process.env.AI_PROVIDER || 'OPENROUTER').toUpperCase(),
     apiKey: process.env.AI_API_KEY || '',
-    model: process.env.AI_MODEL || 'google/gemini-1.5-flash',
+    model: process.env.AI_MODEL || 'google/gemini-flash-1.5',
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',

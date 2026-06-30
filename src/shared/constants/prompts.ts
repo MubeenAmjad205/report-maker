@@ -1,35 +1,22 @@
-export const REPORT_GENERATION_PROMPT = `
-You are an expert developer assistant. Your task is to generate a professional daily progress report based on the raw commit data provided.
+/**
+ * The report's structure, stats, links, and formatting are now assembled deterministically
+ * in code (see generator.ts). The AI's ONLY job is to turn raw commit data into concise,
+ * professional summary bullets per repository, returned as strict JSON. This guarantees that
+ * links and numbers are never altered or hallucinated by the model.
+ */
+export const COMMIT_SUMMARY_PROMPT = `
+You are an expert developer assistant. Below is raw commit data (commit messages + code diffs) grouped by repository.
 
-The report MUST be formatted using clear plain-text formatting with emojis. Do NOT use markdown bold (**), italics (*), or standard markdown bullet points (-), as these break when copy-pasted into MS Teams.
+For EACH repository, write 2 to 6 concise, professional bullet points describing what was actually achieved in the code. READ THE DIFFS and describe the real, high-level change — not just a restatement of the commit message. Treat each repository in isolation; never mix concepts between repositories.
 
-Use EXACTLY this template, ensuring there is a BLANK LINE between every section and bullet point so copy-pasting preserves the spacing:
+STRICT OUTPUT RULES:
+- Each bullet is ONE plain-text sentence.
+- NO leading bullet symbols, NO markdown (** _ # - \`), NO emojis, NO links inside the text.
+- Respond with ONLY a single valid JSON object and NOTHING else (no prose, no code fences).
+- The JSON maps each repository's FULL NAME (exactly as given, e.g. "owner/repo") to an array of bullet strings.
 
-📅 Date: {DATE}
-
-👤 Developer: {DEVELOPER_NAME}
-
-🚀 Project: {PROJECT_NAME} ({NUMBER} Commits)
-📈 Stats: {FILES} Files Changed • +{ADDITIONS} • -{DELETIONS}
-
-✅ Completed:
-
-• {High-level summary of commit 1}
-
-• {High-level summary of commit 2}
-
-*(Repeat the Project and Completed sections dynamically for EVERY unique project found in the data)*
-
-Rules:
-1. Group all commits strictly by their repository name.
-2. IMPORTANT: You MUST include ALL projects found in the data. Do NOT arbitrarily limit to 2 projects. If there are 5 projects, list all 5.
-3. Format the repository name into a human-readable Project Name. For example, convert "username/report-maker" or "report-maker" into "Report Maker", capitalized nicely without hyphens.
-4. Extract the AGGREGATE STATS provided for each repository and place them perfectly into the Stats line.
-5. Treat every Project as completely isolated. Do NOT combine or connect concepts from different repositories.
-6. READ THE CODE DIFFS provided for each commit. Consolidate the actual code changes and the commit message into meaningful, high-level professional bullet points under their specific Project. Describe what was fundamentally achieved in the code, not just the commit message.
-6. Use the • symbol for bullet points, NOT the - symbol.
-7. NEVER use **bold** or *italics* markdown syntax.
-8. MUST leave an empty line between every single bullet point and header.
+Example of the EXACT expected output format:
+{"owner/repo-a": ["Implemented token refresh handling to prevent expired-session failures.", "Refactored the report aggregator into pure functions."], "owner/repo-b": ["Fixed the off-by-one error in the pagination loop."]}
 
 Raw Data:
 {DATA}
