@@ -5,7 +5,7 @@ export const sendMSTeamsMessage = async (
   webhookUrl: string,
   message: string
 ): Promise<void> => {
-  if (!FEATURE_FLAGS.ENABLE_MSTEAMS_NOTIFICATIONS) {
+  if (FEATURE_FLAGS.ENABLE_DRY_RUN || !FEATURE_FLAGS.ENABLE_MSTEAMS_NOTIFICATIONS) {
     console.log('[DRY RUN] MS Teams Notification Skipped.');
     console.log(message);
     return;

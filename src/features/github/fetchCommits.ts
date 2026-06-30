@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { GithubCommit } from '../../shared/types/global.types';
+import { mapWithConcurrency, GITHUB_API_CONCURRENCY } from '../../shared/utils/concurrency.utils';
 
 export const fetchTodayCommits = async (
   token: string,
@@ -37,7 +38,8 @@ export const fetchTodayCommits = async (
                   message: commit.message,
                   date: event.created_at,
                   authorName: commit.author?.name || username,
-                  codeDiff: commit.url // Temporarily store URL, we'll fetch the code below
+                  codeDiff: commit.url, // Temporarily store URL, we'll fetch the code below
+                  commitUrl: `https://github.com/${repoName}/commit/${commit.sha}`,
                 });
               }
             }
@@ -69,7 +71,8 @@ export const fetchTodayCommits = async (
           message: item.commit.message,
           date: item.commit.author.date,
           authorName: item.commit.author.name,
-          codeDiff: item.url
+          codeDiff: item.url,
+          commitUrl: item.html_url,
         });
       }
     }
@@ -85,51 +88,56 @@ export const fetchTodayCommits = async (
       params: { sort: 'pushed', direction: 'desc', per_page: 20 },
     });
 
-    for (const repo of reposRes.data || []) {
-      const pushedDate = new Date(repo.pushed_at);
-      if (pushedDate >= sinceDate) {
-        const repoName = repo.full_name;
-        // Fetch all branches for this recently pushed repo
-        try {
-          const branchesRes = await axios.get(`https://api.github.com/repos/${repoName}/branches`, { headers });
-          
-          for (const branch of branchesRes.data || []) {
-            try {
-              // Fetch commits for this specific branch authored by the user today
-              const branchCommitsRes = await axios.get(`https://api.github.com/repos/${repoName}/commits`, {
-                headers,
-                params: { sha: branch.name, author: username, since },
-              });
+    // Only scan repos actually pushed today; parallelize across repos with a bounded pool.
+    // (Branches within a repo stay sequential so total in-flight requests stay capped.)
+    const reposPushedToday = (reposRes.data || []).filter(
+      (repo: any) => new Date(repo.pushed_at) >= sinceDate
+    );
 
-              for (const item of branchCommitsRes.data || []) {
-                const key = `${repoName}-${item.sha}`;
-                if (!commitsMap.has(key)) {
-                  commitsMap.set(key, {
-                    repoName,
-                    message: item.commit.message,
-                    date: item.commit.author.date,
-                    authorName: item.commit.author.name,
-                    codeDiff: item.url
-                  });
-                }
+    await mapWithConcurrency(reposPushedToday, GITHUB_API_CONCURRENCY, async (repo: any) => {
+      const repoName = repo.full_name;
+      // Fetch all branches for this recently pushed repo
+      try {
+        const branchesRes = await axios.get(`https://api.github.com/repos/${repoName}/branches`, { headers });
+
+        for (const branch of branchesRes.data || []) {
+          try {
+            // Fetch commits for this specific branch authored by the user today
+            const branchCommitsRes = await axios.get(`https://api.github.com/repos/${repoName}/commits`, {
+              headers,
+              params: { sha: branch.name, author: username, since },
+            });
+
+            for (const item of branchCommitsRes.data || []) {
+              const key = `${repoName}-${item.sha}`;
+              if (!commitsMap.has(key)) {
+                commitsMap.set(key, {
+                  repoName,
+                  message: item.commit.message,
+                  date: item.commit.author.date,
+                  authorName: item.commit.author.name,
+                  codeDiff: item.url,
+                  commitUrl: item.html_url,
+                });
               }
-            } catch (e) {
-              // Ignore branch-specific errors
             }
+          } catch (e) {
+            // Ignore branch-specific errors
           }
-        } catch (e) {
-          // Ignore repo-specific branch fetching errors
         }
+      } catch (e) {
+        // Ignore repo-specific branch fetching errors
       }
-    }
+    });
   } catch (error: any) {
     console.warn('Direct Repo Scanning encountered an error:', error.response?.data || error.message);
   }
 
   const uniqueCommits = Array.from(commitsMap.values());
 
-  // 4. Fetch Code Diffs for each commit to allow the AI to read the actual code changes
-  for (const commit of uniqueCommits) {
+  // 4. Fetch Code Diffs for each commit to allow the AI to read the actual code changes.
+  //    Parallelized with a bounded pool — this is the heaviest fan-out (one call per commit).
+  await mapWithConcurrency(uniqueCommits, GITHUB_API_CONCURRENCY, async (commit) => {
     if (commit.codeDiff && commit.codeDiff.startsWith('https://api.github.com/')) {
       try {
         const commitData = await axios.get(commit.codeDiff, { headers });
@@ -141,19 +149,25 @@ export const fetchTodayCommits = async (
         // Smart Token Optimization: Truncate per-file to ensure we see all files, rather than blindly truncating the massive string
         let totalAdditions = 0;
         let totalDeletions = 0;
-        
+        const fileTypes: Record<string, number> = {};
+
         const patch = files
           .map((f: any) => {
             totalAdditions += f.additions || 0;
             totalDeletions += f.deletions || 0;
+            // Tally the file extension (e.g. ".ts", ".css") for a per-repo breakdown
+            const dotIndex = f.filename.lastIndexOf('.');
+            const ext = dotIndex > 0 ? f.filename.slice(dotIndex) : '(no ext)';
+            fileTypes[ext] = (fileTypes[ext] || 0) + 1;
             const filePatch = f.patch || 'No patch available';
             // 400 chars is usually enough to see the core logic change without reading boilerplate
             return `File: ${f.filename}\n${filePatch.substring(0, 400)}${filePatch.length > 400 ? '...(truncated)' : ''}`;
           })
           .join('\n\n')
           .substring(0, 2000); // Safe maximum per commit
-        
+
         commit.codeDiff = patch ? patch : 'No code changes found.';
+        commit.fileTypes = fileTypes;
         commit.stats = {
           files: files.length,
           additions: totalAdditions,
@@ -167,7 +181,41 @@ export const fetchTodayCommits = async (
       commit.codeDiff = 'No URL available for diff.';
       commit.stats = { files: 0, additions: 0, deletions: 0 };
     }
-  }
+  });
 
   return uniqueCommits;
+};
+
+/**
+ * Returns the full names (owner/repo) of repositories the user has access to that were
+ * pushed since the given timestamp. Used to surface repos that may have PR activity today
+ * even when the user authored no commits in them.
+ */
+export const fetchRecentlyPushedRepos = async (
+  token: string,
+  since: string
+): Promise<string[]> => {
+  const sinceDate = new Date(since);
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+  };
+
+  const names: string[] = [];
+  try {
+    const reposRes = await axios.get(`https://api.github.com/user/repos`, {
+      headers,
+      params: { sort: 'pushed', direction: 'desc', per_page: 20 },
+    });
+
+    for (const repo of reposRes.data || []) {
+      if (new Date(repo.pushed_at) >= sinceDate) {
+        names.push(repo.full_name);
+      }
+    }
+  } catch (error: any) {
+    console.warn('Recently-pushed repo lookup encountered an error:', error.response?.data || error.message);
+  }
+
+  return names;
 };

@@ -1,5 +1,7 @@
 import { config, validateConfig } from './core/config/env';
-import { fetchTodayCommits } from './features/github/fetchCommits';
+import { fetchTodayCommits, fetchRecentlyPushedRepos } from './features/github/fetchCommits';
+import { fetchTodayPullRequests } from './features/github/fetchPullRequests';
+import { fetchTodayWorkflowRuns } from './features/github/fetchWorkflowRuns';
 import { generateReport } from './features/ai/generator';
 import { sendTelegramMessage } from './features/notifier/telegram';
 import { sendGitHubIssueNotification } from './features/notifier/github';
@@ -22,17 +24,37 @@ const main = async () => {
 
     console.log(`Found ${commits.length} commits.`);
 
-    if (commits.length === 0) {
-      console.log('No commits today. Sending empty report template.');
+    // 2b. Determine candidate repos: every repo with commits today, plus any repo pushed
+    //     today (to catch repos with PR/CI activity but no user commits).
+    const sinceISO = getSinceISOString();
+    const pushedRepos = await fetchRecentlyPushedRepos(config.github.token, sinceISO);
+    const candidateRepos = Array.from(
+      new Set([...commits.map((c) => c.repoName), ...pushedRepos])
+    );
+    // 2c. Fetch PR activity and CI workflow runs concurrently (independent of each other).
+    console.log(`Scanning ${candidateRepos.length} repositories for pull-request and CI activity...`);
+    const [prsByRepo, runsByRepo] = await Promise.all([
+      fetchTodayPullRequests(config.github.token, candidateRepos, sinceISO),
+      fetchTodayWorkflowRuns(config.github.token, candidateRepos, sinceISO),
+    ]);
+    const totalPRs = Array.from(prsByRepo.values()).reduce((sum, list) => sum + list.length, 0);
+    const totalRuns = Array.from(runsByRepo.values()).reduce((sum, list) => sum + list.length, 0);
+    console.log(`Found ${totalPRs} pull requests across ${prsByRepo.size} repositories.`);
+    console.log(`Found ${totalRuns} workflow runs across ${runsByRepo.size} repositories.`);
+
+    if (commits.length === 0 && prsByRepo.size === 0 && runsByRepo.size === 0) {
+      console.log('No activity today. Sending empty report template.');
     }
 
     // 3. Process Data (AI Generation)
     console.log(`Generating report using ${config.ai.provider}...`);
-    
+
     const developerName = commits[0]?.authorName || config.github.username;
-    
+
     const result = await generateReport(
       commits,
+      prsByRepo,
+      runsByRepo,
       config.ai.provider,
       config.ai.apiKey,
       config.ai.model,
@@ -64,12 +86,16 @@ const main = async () => {
       telemetryMsg += `⏱️ 𝗘𝘅𝗲𝗰𝘂𝘁𝗶𝗼𝗻 𝗙𝗹𝗼𝘄:\n`;
       telemetryMsg += `1️⃣ Search & Events API Retrieval\n`;
       telemetryMsg += `2️⃣ Direct Repository & Branch Fallback Scan\n`;
-      telemetryMsg += `3️⃣ Code Diff Extraction & Token Optimization\n`;
-      telemetryMsg += `4️⃣ AI Synthesis via ${config.ai.provider}\n\n`;
+      telemetryMsg += `3️⃣ Pull Request Activity Scan (Opened/Merged/Closed)\n`;
+      telemetryMsg += `4️⃣ CI Workflow Run Scan (Success/Failed)\n`;
+      telemetryMsg += `5️⃣ Code Diff Extraction & Token Optimization\n`;
+      telemetryMsg += `6️⃣ Deterministic Report Assembly + AI Summaries via ${config.ai.provider}\n\n`;
       
       const totalFiles = commits.reduce((sum, c) => sum + (c.stats?.files || 0), 0);
       telemetryMsg += `📊 𝗗𝗮𝘁𝗮 𝗦𝘁𝗮𝘁𝘀:\n`;
       telemetryMsg += `• Total Commits Found: ${commits.length}\n`;
+      telemetryMsg += `• Total Pull Requests Found: ${totalPRs}\n`;
+      telemetryMsg += `• Total CI Workflow Runs Found: ${totalRuns}\n`;
       telemetryMsg += `• Total Files Processed: ${totalFiles}\n`;
       telemetryMsg += `• Filtered/Missed: .lock files, images, and build folders (Ignored to save tokens)\n\n`;
 
@@ -105,7 +131,7 @@ const main = async () => {
     
     // Attempt to notify of global failure if config allows
     try {
-      const errorMsg = `⚠️ **CRITICAL FAILURE:** Report Maker encountered an unexpected error.\n\n\`\`\`json\n${JSON.stringify(error.message || error, null, 2)}\n\`\`\``;
+      const errorMsg = `⚠️ CRITICAL FAILURE: Report Maker encountered an unexpected error.\n\n${JSON.stringify(error.message || error, null, 2)}`;
       
       if (config.msteams?.webhookUrl) {
         const { sendMSTeamsMessage } = await import('./features/notifier/msteams');
