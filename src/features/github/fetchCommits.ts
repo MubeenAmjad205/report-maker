@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { GithubCommit } from '../../shared/types/global.types';
+import { mapWithConcurrency, GITHUB_API_CONCURRENCY } from '../../shared/utils/concurrency.utils';
 
 export const fetchTodayCommits = async (
   token: string,
@@ -87,52 +88,56 @@ export const fetchTodayCommits = async (
       params: { sort: 'pushed', direction: 'desc', per_page: 20 },
     });
 
-    for (const repo of reposRes.data || []) {
-      const pushedDate = new Date(repo.pushed_at);
-      if (pushedDate >= sinceDate) {
-        const repoName = repo.full_name;
-        // Fetch all branches for this recently pushed repo
-        try {
-          const branchesRes = await axios.get(`https://api.github.com/repos/${repoName}/branches`, { headers });
-          
-          for (const branch of branchesRes.data || []) {
-            try {
-              // Fetch commits for this specific branch authored by the user today
-              const branchCommitsRes = await axios.get(`https://api.github.com/repos/${repoName}/commits`, {
-                headers,
-                params: { sha: branch.name, author: username, since },
-              });
+    // Only scan repos actually pushed today; parallelize across repos with a bounded pool.
+    // (Branches within a repo stay sequential so total in-flight requests stay capped.)
+    const reposPushedToday = (reposRes.data || []).filter(
+      (repo: any) => new Date(repo.pushed_at) >= sinceDate
+    );
 
-              for (const item of branchCommitsRes.data || []) {
-                const key = `${repoName}-${item.sha}`;
-                if (!commitsMap.has(key)) {
-                  commitsMap.set(key, {
-                    repoName,
-                    message: item.commit.message,
-                    date: item.commit.author.date,
-                    authorName: item.commit.author.name,
-                    codeDiff: item.url,
-                    commitUrl: item.html_url,
-                  });
-                }
+    await mapWithConcurrency(reposPushedToday, GITHUB_API_CONCURRENCY, async (repo: any) => {
+      const repoName = repo.full_name;
+      // Fetch all branches for this recently pushed repo
+      try {
+        const branchesRes = await axios.get(`https://api.github.com/repos/${repoName}/branches`, { headers });
+
+        for (const branch of branchesRes.data || []) {
+          try {
+            // Fetch commits for this specific branch authored by the user today
+            const branchCommitsRes = await axios.get(`https://api.github.com/repos/${repoName}/commits`, {
+              headers,
+              params: { sha: branch.name, author: username, since },
+            });
+
+            for (const item of branchCommitsRes.data || []) {
+              const key = `${repoName}-${item.sha}`;
+              if (!commitsMap.has(key)) {
+                commitsMap.set(key, {
+                  repoName,
+                  message: item.commit.message,
+                  date: item.commit.author.date,
+                  authorName: item.commit.author.name,
+                  codeDiff: item.url,
+                  commitUrl: item.html_url,
+                });
               }
-            } catch (e) {
-              // Ignore branch-specific errors
             }
+          } catch (e) {
+            // Ignore branch-specific errors
           }
-        } catch (e) {
-          // Ignore repo-specific branch fetching errors
         }
+      } catch (e) {
+        // Ignore repo-specific branch fetching errors
       }
-    }
+    });
   } catch (error: any) {
     console.warn('Direct Repo Scanning encountered an error:', error.response?.data || error.message);
   }
 
   const uniqueCommits = Array.from(commitsMap.values());
 
-  // 4. Fetch Code Diffs for each commit to allow the AI to read the actual code changes
-  for (const commit of uniqueCommits) {
+  // 4. Fetch Code Diffs for each commit to allow the AI to read the actual code changes.
+  //    Parallelized with a bounded pool — this is the heaviest fan-out (one call per commit).
+  await mapWithConcurrency(uniqueCommits, GITHUB_API_CONCURRENCY, async (commit) => {
     if (commit.codeDiff && commit.codeDiff.startsWith('https://api.github.com/')) {
       try {
         const commitData = await axios.get(commit.codeDiff, { headers });
@@ -176,7 +181,7 @@ export const fetchTodayCommits = async (
       commit.codeDiff = 'No URL available for diff.';
       commit.stats = { files: 0, additions: 0, deletions: 0 };
     }
-  }
+  });
 
   return uniqueCommits;
 };

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { GithubPullRequest } from '../../shared/types/global.types';
+import { mapWithConcurrency, GITHUB_API_CONCURRENCY } from '../../shared/utils/concurrency.utils';
 
 /**
  * Fetches all pull-request activity (any author) for the given repositories that occurred
@@ -21,7 +22,7 @@ export const fetchTodayPullRequests = async (
     Accept: 'application/vnd.github.v3+json',
   };
 
-  for (const repoName of repoNames) {
+  await mapWithConcurrency(repoNames, GITHUB_API_CONCURRENCY, async (repoName) => {
     try {
       const res = await axios.get(`https://api.github.com/repos/${repoName}/pulls`, {
         headers,
@@ -60,7 +61,7 @@ export const fetchTodayPullRequests = async (
     } catch (error: any) {
       console.warn(`PR fetch for ${repoName} encountered an error:`, error.response?.data || error.message);
     }
-  }
+  });
 
   return result;
 };

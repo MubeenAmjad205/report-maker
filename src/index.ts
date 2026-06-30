@@ -24,22 +24,22 @@ const main = async () => {
 
     console.log(`Found ${commits.length} commits.`);
 
-    // 2b. Fetch Pull Request activity (any author) across every repo touched today,
-    //     plus any repo pushed today (to catch PR-only repos with no user commits).
+    // 2b. Determine candidate repos: every repo with commits today, plus any repo pushed
+    //     today (to catch repos with PR/CI activity but no user commits).
     const sinceISO = getSinceISOString();
     const pushedRepos = await fetchRecentlyPushedRepos(config.github.token, sinceISO);
     const candidateRepos = Array.from(
       new Set([...commits.map((c) => c.repoName), ...pushedRepos])
     );
-    console.log(`Scanning ${candidateRepos.length} repositories for pull-request activity...`);
-    const prsByRepo = await fetchTodayPullRequests(config.github.token, candidateRepos, sinceISO);
+    // 2c. Fetch PR activity and CI workflow runs concurrently (independent of each other).
+    console.log(`Scanning ${candidateRepos.length} repositories for pull-request and CI activity...`);
+    const [prsByRepo, runsByRepo] = await Promise.all([
+      fetchTodayPullRequests(config.github.token, candidateRepos, sinceISO),
+      fetchTodayWorkflowRuns(config.github.token, candidateRepos, sinceISO),
+    ]);
     const totalPRs = Array.from(prsByRepo.values()).reduce((sum, list) => sum + list.length, 0);
-    console.log(`Found ${totalPRs} pull requests across ${prsByRepo.size} repositories.`);
-
-    // 2c. Fetch today's GitHub Actions workflow runs (success/failed) per repo.
-    console.log(`Scanning ${candidateRepos.length} repositories for CI workflow runs...`);
-    const runsByRepo = await fetchTodayWorkflowRuns(config.github.token, candidateRepos, sinceISO);
     const totalRuns = Array.from(runsByRepo.values()).reduce((sum, list) => sum + list.length, 0);
+    console.log(`Found ${totalPRs} pull requests across ${prsByRepo.size} repositories.`);
     console.log(`Found ${totalRuns} workflow runs across ${runsByRepo.size} repositories.`);
 
     if (commits.length === 0 && prsByRepo.size === 0 && runsByRepo.size === 0) {
