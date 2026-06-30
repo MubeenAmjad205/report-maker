@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getTodayDateString } from '../../shared/utils/date.utils';
+import { FEATURE_FLAGS } from '../../shared/constants/flags';
 
 export const sendGitHubIssueNotification = async (
   token: string,
@@ -7,6 +8,12 @@ export const sendGitHubIssueNotification = async (
   username: string,
   reportText: string
 ): Promise<void> => {
+  if (FEATURE_FLAGS.ENABLE_DRY_RUN) {
+    console.log('[DRY RUN] GitHub Issue Notification Skipped.');
+    console.log(reportText);
+    return;
+  }
+
   try {
     const url = `https://api.github.com/repos/${repoFullName}/issues`;
     

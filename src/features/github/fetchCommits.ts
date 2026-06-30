@@ -37,7 +37,8 @@ export const fetchTodayCommits = async (
                   message: commit.message,
                   date: event.created_at,
                   authorName: commit.author?.name || username,
-                  codeDiff: commit.url // Temporarily store URL, we'll fetch the code below
+                  codeDiff: commit.url, // Temporarily store URL, we'll fetch the code below
+                  commitUrl: `https://github.com/${repoName}/commit/${commit.sha}`,
                 });
               }
             }
@@ -69,7 +70,8 @@ export const fetchTodayCommits = async (
           message: item.commit.message,
           date: item.commit.author.date,
           authorName: item.commit.author.name,
-          codeDiff: item.url
+          codeDiff: item.url,
+          commitUrl: item.html_url,
         });
       }
     }
@@ -109,7 +111,8 @@ export const fetchTodayCommits = async (
                     message: item.commit.message,
                     date: item.commit.author.date,
                     authorName: item.commit.author.name,
-                    codeDiff: item.url
+                    codeDiff: item.url,
+                    commitUrl: item.html_url,
                   });
                 }
               }
@@ -141,19 +144,25 @@ export const fetchTodayCommits = async (
         // Smart Token Optimization: Truncate per-file to ensure we see all files, rather than blindly truncating the massive string
         let totalAdditions = 0;
         let totalDeletions = 0;
-        
+        const fileTypes: Record<string, number> = {};
+
         const patch = files
           .map((f: any) => {
             totalAdditions += f.additions || 0;
             totalDeletions += f.deletions || 0;
+            // Tally the file extension (e.g. ".ts", ".css") for a per-repo breakdown
+            const dotIndex = f.filename.lastIndexOf('.');
+            const ext = dotIndex > 0 ? f.filename.slice(dotIndex) : '(no ext)';
+            fileTypes[ext] = (fileTypes[ext] || 0) + 1;
             const filePatch = f.patch || 'No patch available';
             // 400 chars is usually enough to see the core logic change without reading boilerplate
             return `File: ${f.filename}\n${filePatch.substring(0, 400)}${filePatch.length > 400 ? '...(truncated)' : ''}`;
           })
           .join('\n\n')
           .substring(0, 2000); // Safe maximum per commit
-        
+
         commit.codeDiff = patch ? patch : 'No code changes found.';
+        commit.fileTypes = fileTypes;
         commit.stats = {
           files: files.length,
           additions: totalAdditions,
@@ -170,4 +179,38 @@ export const fetchTodayCommits = async (
   }
 
   return uniqueCommits;
+};
+
+/**
+ * Returns the full names (owner/repo) of repositories the user has access to that were
+ * pushed since the given timestamp. Used to surface repos that may have PR activity today
+ * even when the user authored no commits in them.
+ */
+export const fetchRecentlyPushedRepos = async (
+  token: string,
+  since: string
+): Promise<string[]> => {
+  const sinceDate = new Date(since);
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+  };
+
+  const names: string[] = [];
+  try {
+    const reposRes = await axios.get(`https://api.github.com/user/repos`, {
+      headers,
+      params: { sort: 'pushed', direction: 'desc', per_page: 20 },
+    });
+
+    for (const repo of reposRes.data || []) {
+      if (new Date(repo.pushed_at) >= sinceDate) {
+        names.push(repo.full_name);
+      }
+    }
+  } catch (error: any) {
+    console.warn('Recently-pushed repo lookup encountered an error:', error.response?.data || error.message);
+  }
+
+  return names;
 };

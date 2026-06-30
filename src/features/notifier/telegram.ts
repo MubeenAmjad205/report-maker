@@ -6,7 +6,7 @@ export const sendTelegramMessage = async (
   chatId: string,
   message: string
 ): Promise<void> => {
-  if (!FEATURE_FLAGS.ENABLE_TELEGRAM_NOTIFICATIONS) {
+  if (FEATURE_FLAGS.ENABLE_DRY_RUN || !FEATURE_FLAGS.ENABLE_TELEGRAM_NOTIFICATIONS) {
     console.log('[DRY RUN] Telegram Notification Skipped.');
     console.log(message);
     return;
