@@ -8,7 +8,10 @@ A fully automated, zero-deployment pipeline that runs daily on GitHub Actions to
 - **Cross-Repo Tracking:** Extracts commits across your public and private repositories using a single Personal Access Token (via the Events API, Search API, and a direct branch scan of your most recently pushed repos).
 - **Deterministic, AI-Safe Reports:** The report's structure, stats, links, owner grouping, and charts are assembled in **code** — the AI only writes the prose summary bullets. This guarantees links and numbers are never altered or hallucinated. If the AI provider is unavailable, the report still generates (falling back to commit messages for the bullets).
 - **Owner-Grouped Reports:** Activity is grouped first by repository **owner** (e.g. `MubeenAmjad205`, `nabeeltahir`, or any organization), each with a summary header, then by repository under that owner.
-- **Daily Totals + Net LOC:** A header shows grand totals across everything — repos, commits, PRs, CI runs, additions/deletions, net code, and churn — plus per-owner net-LOC summaries.
+- **At-a-Glance Dashboard:** A one-line ⚡ headline ("5 commits • 2 projects • 1 PR merged • all CI green"), grand totals (repos, commits, PRs, CI runs, net LOC, churn), and styled dividers — all rendered with Teams-safe Unicode.
+- **Commit-Type Badges:** Conventional-commit prefixes are tallied into badges (`✨ 2 feat • 🐛 1 fix • ♻️ 1 refactor`) per report and per repo.
+- **Code Balance Bar:** A proportional 🟩/🟥 bar shows additions vs deletions with a percentage, per report and per repo.
+- **CI Health Summary:** Each repo shows a colored-dot strip and pass rate (`🟢🔴🟢 → 2/3 passed (67%)`) alongside the run list.
 - **Commit Bar Charts:** Each owner group includes a Unicode bar chart of commits per project (Teams/Telegram safe).
 - **Pull Request Tracking:** For every repository, the report lists pull requests **opened**, **merged**, and **closed (without merge)** today — with their titles, authors, and direct links. Repositories with PR activity but no commits are still included.
 - **CI / Actions Runs:** For every repository, the report lists GitHub Actions workflow runs that executed today, marked ✅ success / ❌ failure / ⚪ other, with direct links to each run.

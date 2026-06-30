@@ -77,6 +77,70 @@ const PR_LABEL: Record<GithubPullRequest['status'], string> = {
   closed: 'Closed (not merged)',
 };
 
+// Styled section dividers (Teams-safe Unicode box-drawing).
+const OWNER_DIVIDER = '━'.repeat(28);
+const REPO_DIVIDER = '┈'.repeat(24);
+
+// Conventional-commit type -> badge, in display order.
+const COMMIT_TYPE_META: Record<string, { emoji: string; label: string }> = {
+  feat: { emoji: '✨', label: 'feat' },
+  fix: { emoji: '🐛', label: 'fix' },
+  refactor: { emoji: '♻️', label: 'refactor' },
+  perf: { emoji: '⚡', label: 'perf' },
+  docs: { emoji: '📝', label: 'docs' },
+  test: { emoji: '🧪', label: 'test' },
+  build: { emoji: '📦', label: 'build' },
+  ci: { emoji: '⚙️', label: 'ci' },
+  style: { emoji: '💅', label: 'style' },
+  chore: { emoji: '🧹', label: 'chore' },
+  revert: { emoji: '⏪', label: 'revert' },
+  other: { emoji: '📌', label: 'other' },
+};
+
+const commitTypeKey = (message: string): string => {
+  const first = message.split('\n')[0].trim().toLowerCase();
+  const match = first.match(/^([a-z]+)(\([^)]*\))?!?:/);
+  return match && COMMIT_TYPE_META[match[1]] ? match[1] : 'other';
+};
+
+/** "✨ 4 feat  •  🐛 2 fix  •  ♻️ 1 refactor" (empty string if no commits). */
+const formatCommitTypes = (commits: GithubCommit[]): string => {
+  const counts: Record<string, number> = {};
+  for (const c of commits) {
+    const key = commitTypeKey(c.message);
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return Object.keys(COMMIT_TYPE_META)
+    .filter((k) => counts[k])
+    .map((k) => `${COMMIT_TYPE_META[k].emoji} ${counts[k]} ${COMMIT_TYPE_META[k].label}`)
+    .join('  •  ');
+};
+
+/** Proportional 🟩/🟥 bar of additions vs deletions. */
+const codeBalanceBar = (additions: number, deletions: number, width = 10): string => {
+  const total = additions + deletions;
+  if (total === 0) return `${'⬜'.repeat(width)}  +0 / -0`;
+  const green = Math.max(0, Math.min(width, Math.round((additions / total) * width)));
+  const red = width - green;
+  const pct = Math.round((additions / total) * 100);
+  return `${'🟩'.repeat(green)}${'🟥'.repeat(red)}  +${additions} / -${deletions} (${pct}% added)`;
+};
+
+/** "⚙️ CI Health: 🟢🟢🔴  →  2/3 passed (67%)" */
+const ciHealthLine = (runs: GithubWorkflowRun[]): string => {
+  const dots = runs
+    .map((r) => (r.conclusion === 'success' ? '🟢' : r.conclusion === 'failure' ? '🔴' : '⚪'))
+    .join('');
+  const success = runs.filter((r) => r.conclusion === 'success').length;
+  const failure = runs.filter((r) => r.conclusion === 'failure').length;
+  const completed = success + failure;
+  const summary =
+    completed > 0
+      ? `${success}/${completed} passed (${Math.round((success / completed) * 100)}%)`
+      : `${runs.length} run(s) in progress`;
+  return `⚙️ CI Health: ${dots}  →  ${summary}`;
+};
+
 // ---------------------------------------------------------------------------
 // AI step: turn commit data into per-repo summary bullets (the ONLY AI output)
 // ---------------------------------------------------------------------------
@@ -228,28 +292,43 @@ export const generateReport = async (
   let gRepos = 0;
   let gCommits = 0;
   let gPRs = 0;
+  let gMergedPRs = 0;
   let gRuns = 0;
+  let gCiFailures = 0;
   let gAdds = 0;
   let gDels = 0;
   for (const repo of repos.values()) {
     gRepos += 1;
     gCommits += repo.commits.length;
     gPRs += repo.pullRequests.length;
+    gMergedPRs += repo.pullRequests.filter((p) => p.status === 'merged').length;
     gRuns += repo.workflowRuns.length;
+    gCiFailures += repo.workflowRuns.filter((r) => r.conclusion === 'failure').length;
     gAdds += repo.stats.additions;
     gDels += repo.stats.deletions;
   }
   const net = gAdds - gDels;
   const netStr = `${net >= 0 ? '+' : ''}${net}`;
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
   // 5. Assemble the report.
   const lines: string[] = [];
   lines.push(`📅 Date: ${getTodayDateString()}`);
   lines.push(`👤 Developer: ${developerName}`);
+
+  // Headline: one glanceable summary line.
+  const headline: string[] = [plural(gCommits, 'commit'), plural(gRepos, 'project')];
+  if (gMergedPRs > 0) headline.push(`${plural(gMergedPRs, 'PR')} merged`);
+  if (gRuns > 0) headline.push(gCiFailures === 0 ? 'all CI green ✅' : `${plural(gCiFailures, 'CI fail')} ❌`);
+  lines.push(`⚡ Today: ${headline.join(' • ')}`);
+
   lines.push(
     `📊 Daily Totals: ${gRepos} Repos • ${gCommits} Commits • ${gPRs} PRs • ${gRuns} CI Runs`
   );
   lines.push(`🧮 Net Code: +${gAdds} / -${gDels} (net ${netStr}) • Churn ${gAdds + gDels} lines`);
+  lines.push(`⚖️ Code Balance: ${codeBalanceBar(gAdds, gDels)}`);
+  const grandTypes = formatCommitTypes(commits);
+  if (grandTypes) lines.push(`🏷️ Types: ${grandTypes}`);
 
   for (const [owner, ownerRepos] of owners.entries()) {
     let oCommits = 0;
@@ -265,7 +344,7 @@ export const generateReport = async (
     }
     const oNet = oAdds - oDels;
 
-    lines.push('════════════════════════════');
+    lines.push(OWNER_DIVIDER);
     lines.push(`🏢 Owner: ${owner}`);
     lines.push(
       `📊 Summary: ${ownerRepos.length} Repos • ${oCommits} Commits • ${oPRs} PRs • +${oAdds} / -${oDels} (net ${oNet >= 0 ? '+' : ''}${oNet})`
@@ -283,7 +362,7 @@ export const generateReport = async (
 
     for (const repoName of ownerRepos) {
       const r = repos.get(repoName)!;
-      lines.push('----------------------------');
+      lines.push(REPO_DIVIDER);
       lines.push(`🚀 Project: ${toProjectName(repoName)} (${r.commits.length} Commits)`);
       lines.push(`🔗 Repo: https://github.com/${repoName}`);
       lines.push(
@@ -291,10 +370,15 @@ export const generateReport = async (
       );
       const ft = formatFileTypes(r.fileTypes);
       if (ft) lines.push(`🧩 File Types: ${ft}`);
+      const repoTypes = formatCommitTypes(r.commits);
+      if (repoTypes) lines.push(`🏷️ Types: ${repoTypes}`);
+      if (r.stats.additions + r.stats.deletions > 0) {
+        lines.push(`⚖️ Balance: ${codeBalanceBar(r.stats.additions, r.stats.deletions)}`);
+      }
 
-      // CI / Actions runs (today only).
+      // CI / Actions runs (today only) — health summary then each run.
       if (r.workflowRuns.length > 0) {
-        lines.push('⚙️ CI Runs:');
+        lines.push(ciHealthLine(r.workflowRuns));
         for (const run of r.workflowRuns) {
           const branch = run.branch ? ` [${run.branch}]` : '';
           lines.push(`• ${RUN_ICON[run.conclusion]} ${run.name} #${run.runNumber}${branch} — ${run.rawConclusion}`);
