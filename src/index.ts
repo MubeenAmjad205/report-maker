@@ -114,15 +114,15 @@ const main = async () => {
     
     // 5. GitHub Notifications (Issue Creation)
     // Uses the runner's default GITHUB_REPOSITORY env var to know where to create the issue
-    if (process.env.GITHUB_REPOSITORY && config.github.token) {
-      console.log(`Sending report to GitHub Issues (${process.env.GITHUB_REPOSITORY})...`);
-      await sendGitHubIssueNotification(
-        config.github.token,
-        process.env.GITHUB_REPOSITORY,
-        config.github.username,
-        report
-      );
-    }
+    // if (process.env.GITHUB_REPOSITORY && config.github.token) {
+    //   console.log(`Sending report to GitHub Issues (${process.env.GITHUB_REPOSITORY})...`);
+    //   await sendGitHubIssueNotification(
+    //     config.github.token,
+    //     process.env.GITHUB_REPOSITORY,
+    //     config.github.username,
+    //     report
+    //   );
+    // }
 
     console.log('Report Maker completed successfully.');
   } catch (error: any) {
