@@ -18,6 +18,7 @@ const bucketConclusion = (conclusion: string | null): WorkflowRunConclusion => {
  */
 export const fetchTodayWorkflowRuns = async (
   token: string,
+  username: string,
   repoNames: string[],
   since: string
 ): Promise<Map<string, GithubWorkflowRun[]>> => {
@@ -36,15 +37,17 @@ export const fetchTodayWorkflowRuns = async (
         params: { created: createdFilter, per_page: 50 },
       });
 
-      const runs: GithubWorkflowRun[] = (res.data?.workflow_runs || []).map((run: any) => ({
-        repoName,
-        name: run.name || run.display_title || 'Workflow',
-        conclusion: bucketConclusion(run.conclusion),
-        rawConclusion: run.conclusion || run.status || 'unknown',
-        url: run.html_url,
-        branch: run.head_branch || '',
-        runNumber: run.run_number,
-      }));
+      const runs: GithubWorkflowRun[] = (res.data?.workflow_runs || [])
+        .filter((run: any) => run.actor?.login === username)
+        .map((run: any) => ({
+          repoName,
+          name: run.name || run.display_title || 'Workflow',
+          conclusion: bucketConclusion(run.conclusion),
+          rawConclusion: run.conclusion || run.status || 'unknown',
+          url: run.html_url,
+          branch: run.head_branch || '',
+          runNumber: run.run_number,
+        }));
 
       if (runs.length > 0) {
         result.set(repoName, runs);

@@ -12,6 +12,7 @@ import { mapWithConcurrency, GITHUB_API_CONCURRENCY } from '../../shared/utils/c
  */
 export const fetchTodayPullRequests = async (
   token: string,
+  username: string,
   repoNames: string[],
   since: string
 ): Promise<Map<string, GithubPullRequest[]>> => {
@@ -32,6 +33,8 @@ export const fetchTodayPullRequests = async (
 
       const prs: GithubPullRequest[] = [];
       for (const pr of res.data || []) {
+        if (pr.user?.login !== username) continue;
+
         // Priority: merged > closed(unmerged) > opened. A PR opened AND merged today is
         // reported once, as merged (the more meaningful outcome).
         let status: GithubPullRequest['status'] | null = null;

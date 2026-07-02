@@ -1,5 +1,5 @@
 import { config, validateConfig } from './core/config/env';
-import { fetchTodayCommits, fetchRecentlyPushedRepos } from './features/github/fetchCommits';
+import { fetchTodayCommits } from './features/github/fetchCommits';
 import { fetchTodayPullRequests } from './features/github/fetchPullRequests';
 import { fetchTodayWorkflowRuns } from './features/github/fetchWorkflowRuns';
 import { generateReport } from './features/ai/generator';
@@ -24,18 +24,17 @@ const main = async () => {
 
     console.log(`Found ${commits.length} commits.`);
 
-    // 2b. Determine candidate repos: every repo with commits today, plus any repo pushed
-    //     today (to catch repos with PR/CI activity but no user commits).
+    // 2b. Determine candidate repos: strictly repositories where the user made a commit today.
     const sinceISO = getSinceISOString();
-    const pushedRepos = await fetchRecentlyPushedRepos(config.github.token, sinceISO);
     const candidateRepos = Array.from(
-      new Set([...commits.map((c) => c.repoName), ...pushedRepos])
+      new Set(commits.map((c) => c.repoName))
     );
+
     // 2c. Fetch PR activity and CI workflow runs concurrently (independent of each other).
     console.log(`Scanning ${candidateRepos.length} repositories for pull-request and CI activity...`);
     const [prsByRepo, runsByRepo] = await Promise.all([
-      fetchTodayPullRequests(config.github.token, candidateRepos, sinceISO),
-      fetchTodayWorkflowRuns(config.github.token, candidateRepos, sinceISO),
+      fetchTodayPullRequests(config.github.token, config.github.username, candidateRepos, sinceISO),
+      fetchTodayWorkflowRuns(config.github.token, config.github.username, candidateRepos, sinceISO),
     ]);
     const totalPRs = Array.from(prsByRepo.values()).reduce((sum, list) => sum + list.length, 0);
     const totalRuns = Array.from(runsByRepo.values()).reduce((sum, list) => sum + list.length, 0);

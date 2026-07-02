@@ -186,36 +186,3 @@ export const fetchTodayCommits = async (
   return uniqueCommits;
 };
 
-/**
- * Returns the full names (owner/repo) of repositories the user has access to that were
- * pushed since the given timestamp. Used to surface repos that may have PR activity today
- * even when the user authored no commits in them.
- */
-export const fetchRecentlyPushedRepos = async (
-  token: string,
-  since: string
-): Promise<string[]> => {
-  const sinceDate = new Date(since);
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/vnd.github.v3+json',
-  };
-
-  const names: string[] = [];
-  try {
-    const reposRes = await axios.get(`https://api.github.com/user/repos`, {
-      headers,
-      params: { sort: 'pushed', direction: 'desc', per_page: 20 },
-    });
-
-    for (const repo of reposRes.data || []) {
-      if (new Date(repo.pushed_at) >= sinceDate) {
-        names.push(repo.full_name);
-      }
-    }
-  } catch (error: any) {
-    console.warn('Recently-pushed repo lookup encountered an error:', error.response?.data || error.message);
-  }
-
-  return names;
-};
